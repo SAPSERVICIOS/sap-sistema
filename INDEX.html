@@ -1975,7 +1975,6 @@ tr:hover td{background:var(--surface2)}
         <div class="form-row"><label>CUIT</label><input type="text" id="cfg-cuit" placeholder="XX-XXXXXXXX-X"></div>
         <div class="form-row"><label>Teléfono</label><input type="text" id="cfg-tel" placeholder="+54 ..."></div>
         <div class="form-row"><label>Email</label><input type="text" id="cfg-email" placeholder="contacto@..."></div>
-        <div class="form-row"><label>GitHub Token <span style="font-size:10px;color:var(--text3)">(para publicar automáticamente)</span></label><input type="password" id="cfg-github-token" placeholder="ghp_..."></div>
       </div>
       <div class="form-actions">
         <button class="btn btn-ghost" onclick="clearAll()">Borrar todos los datos</button>
@@ -2045,10 +2044,11 @@ let informeDataActual=null;
 
 function save(){try{localStorage.setItem('sap_v12_master',JSON.stringify(state));}catch(e){}}
 async function publicarEnGitHub(){
-  const token=(state.config||{}).githubToken||'';
+  // Pedir token en cada publicación — no se guarda en el HTML para evitar exposición
+  let token=(state.config||{}).githubToken||'';
   if(!token){
-    alert('Configurá primero el GitHub Token en la solapa Config.');
-    return;
+    token=prompt('Ingresá tu GitHub Token (ghp_...):');
+    if(!token) return;
   }
   const owner='SAPSERVICIOS';
   const repo='sap-sistema';
@@ -2059,6 +2059,9 @@ async function publicarEnGitHub(){
     btn.disabled=true;btn.textContent='Publicando...';
     // Estampar timestamp y guardar
     state.exportedAt=new Date().toISOString();
+    // Guardar estado SIN el token (no debe quedar en el HTML público)
+    const tokenBackup=state.config&&state.config.githubToken;
+    if(state.config) delete state.config.githubToken;
     save();
     // Obtener el SHA actual del archivo (necesario para actualizarlo)
     const shaRes=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`,{
@@ -2096,6 +2099,7 @@ async function publicarEnGitHub(){
       headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
       body:JSON.stringify(body)
     });
+    if(state.config && tokenBackup) state.config.githubToken=tokenBackup;
     if(res.ok){
       btn.textContent='✓ Publicado!';
       btn.style.background='#1a7f37';
