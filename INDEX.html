@@ -2044,11 +2044,13 @@ let informeDataActual=null;
 
 function save(){try{localStorage.setItem('sap_v12_master',JSON.stringify(state));}catch(e){}}
 async function publicarEnGitHub(){
-  // Pedir token en cada publicación — no se guarda en el HTML para evitar exposición
-  let token=(state.config||{}).githubToken||'';
+  // El token NUNCA se guarda en state ni localStorage — solo en sessionStorage (memoria de sesión)
+  let token=sessionStorage.getItem('sap_gh_token')||'';
   if(!token){
-    token=prompt('Ingresá tu GitHub Token (ghp_...):');
-    if(!token) return;
+    token=prompt('Ingresá tu GitHub Token (ghp_...):\n\nSolo se recuerda durante esta sesión del navegador.');
+    if(!token||!token.trim()) return;
+    token=token.trim();
+    sessionStorage.setItem('sap_gh_token', token);
   }
   const owner='SAPSERVICIOS';
   const repo='sap-sistema';
@@ -2059,8 +2061,7 @@ async function publicarEnGitHub(){
     btn.disabled=true;btn.textContent='Publicando...';
     // Estampar timestamp y guardar
     state.exportedAt=new Date().toISOString();
-    // Guardar estado SIN el token (no debe quedar en el HTML público)
-    const tokenBackup=state.config&&state.config.githubToken;
+    // Asegurar que el token NUNCA quede en state
     if(state.config) delete state.config.githubToken;
     save();
     // Obtener el SHA actual del archivo (necesario para actualizarlo)
@@ -2099,7 +2100,6 @@ async function publicarEnGitHub(){
       headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
       body:JSON.stringify(body)
     });
-    if(state.config && tokenBackup) state.config.githubToken=tokenBackup;
     if(res.ok){
       btn.textContent='✓ Publicado!';
       btn.style.background='#1a7f37';
@@ -2112,6 +2112,11 @@ async function publicarEnGitHub(){
   }catch(e){
     btn.textContent='▲ Publicar en GitHub';btn.style.background='#238636';btn.disabled=false;
     alert('Error al publicar: '+e.message);
+  } finally {
+    // Siempre restaurar el botón aunque haya error silencioso
+    setTimeout(()=>{
+      if(btn.disabled){btn.textContent='▲ Publicar en GitHub';btn.style.background='#238636';btn.disabled=false;}
+    }, 15000);
   }
 }
 
@@ -2159,7 +2164,6 @@ function load(){
   if(document.getElementById('cfg-cuit')) document.getElementById('cfg-cuit').value=c.cuit||'';
   if(document.getElementById('cfg-tel')) document.getElementById('cfg-tel').value=c.tel||'';
   if(document.getElementById('cfg-email')) document.getElementById('cfg-email').value=c.email||'';
-  if(document.getElementById('cfg-github-token')) document.getElementById('cfg-github-token').value=c.githubToken||'';
   
   if(document.getElementById('cfg-pct-javier')) document.getElementById('cfg-pct-javier').value=c.pctJavier||33;
   if(document.getElementById('cfg-pct-ezequiel')) document.getElementById('cfg-pct-ezequiel').value=c.pctEzequiel||34;
@@ -3856,7 +3860,6 @@ function saveConfig(){
   state.config.pctJavier=parseFloat(document.getElementById('cfg-pct-javier').value)||33;
   state.config.pctEzequiel=parseFloat(document.getElementById('cfg-pct-ezequiel').value)||34;
   state.config.pctJorge=parseFloat(document.getElementById('cfg-pct-jorge').value)||33;
-  if(document.getElementById('cfg-github-token')) state.config.githubToken=document.getElementById('cfg-github-token').value.trim();
   save();alert('Configuración guardada ✓');
 }
 function clearAll(){if(!confirm('¿Borrar TODOS los datos?'))return;localStorage.removeItem('sap_v12_master');location.reload();}
